@@ -1,5 +1,21 @@
+#etl_guide.html
+etl_guide.html
+#
+estructura.txt
 
 # Todos los word
 *.docx
 *.doc
 
+# Entorno virtual
+venv/
+__pycache__/
+*.pyc
+
+# Variables de entorno
+.env
+
+# Airflow
+logs/
+plugins/
+airflow.db
