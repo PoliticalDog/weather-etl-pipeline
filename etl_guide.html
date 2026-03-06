@@ -1,0 +1,1332 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ETL Pipeline — Portfolio Guide</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --border: #1e1e2e;
+    --accent: #00ff88;
+    --accent2: #ff6b35;
+    --accent3: #7c3aed;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --code-bg: #0d1117;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Syne', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* NOISE TEXTURE */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.4;
+  }
+
+  .container { max-width: 1000px; margin: 0 auto; padding: 0 2rem; position: relative; z-index: 1; }
+
+  /* HEADER */
+  header {
+    padding: 4rem 0 2rem;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+
+  header::after {
+    content: 'ETL';
+    position: absolute;
+    right: -2rem;
+    top: -1rem;
+    font-size: 14rem;
+    font-weight: 800;
+    color: #ffffff04;
+    font-family: 'Space Mono', monospace;
+    pointer-events: none;
+    line-height: 1;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(0,255,136,0.1);
+    border: 1px solid rgba(0,255,136,0.3);
+    color: var(--accent);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    padding: 0.3rem 0.8rem;
+    border-radius: 2px;
+    letter-spacing: 0.1em;
+    margin-bottom: 1.5rem;
+  }
+
+  .badge::before { content: '▶'; font-size: 0.6rem; }
+
+  h1 {
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 800;
+    line-height: 1.1;
+    margin-bottom: 1rem;
+  }
+
+  h1 em {
+    font-style: normal;
+    color: var(--accent);
+  }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 1rem;
+    max-width: 600px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.85rem;
+  }
+
+  /* PROGRESS TRACKER */
+  .progress-bar {
+    display: flex;
+    gap: 0;
+    margin: 3rem 0 0;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .progress-step {
+    flex: 1;
+    padding: 0.6rem;
+    text-align: center;
+    font-size: 0.65rem;
+    font-family: 'Space Mono', monospace;
+    color: var(--muted);
+    border-right: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+
+  .progress-step:last-child { border-right: none; }
+  .progress-step:hover { background: rgba(255,255,255,0.03); color: var(--text); }
+  .progress-step.active { background: rgba(0,255,136,0.08); color: var(--accent); }
+  .progress-step.done { background: rgba(0,255,136,0.04); color: var(--accent); opacity: 0.6; }
+
+  /* ARCHITECTURE DIAGRAM */
+  .arch-diagram {
+    margin: 3rem 0;
+    padding: 2rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+  }
+
+  .arch-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    margin-bottom: 2rem;
+  }
+
+  .arch-flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+  }
+
+  .arch-node {
+    flex-shrink: 0;
+    text-align: center;
+    padding: 1rem 1.2rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    min-width: 110px;
+  }
+
+  .arch-node .icon { font-size: 1.5rem; margin-bottom: 0.4rem; }
+  .arch-node .label { font-size: 0.7rem; font-family: 'Space Mono', monospace; color: var(--muted); }
+  .arch-node .tech { font-size: 0.75rem; font-weight: 600; color: var(--text); margin-top: 0.2rem; }
+
+  .arch-node.extract { border-color: rgba(0,255,136,0.4); background: rgba(0,255,136,0.05); }
+  .arch-node.transform { border-color: rgba(255,107,53,0.4); background: rgba(255,107,53,0.05); }
+  .arch-node.load { border-color: rgba(124,58,237,0.4); background: rgba(124,58,237,0.05); }
+  .arch-node.orchestrate { border-color: rgba(59,130,246,0.4); background: rgba(59,130,246,0.05); }
+
+  .arch-arrow {
+    flex-shrink: 0;
+    padding: 0 0.5rem;
+    color: var(--muted);
+    font-size: 1.2rem;
+  }
+
+  /* STEPS */
+  .steps { margin: 2rem 0; }
+
+  .step {
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+
+  .step:hover { border-color: rgba(255,255,255,0.1); }
+  .step.active-step { border-color: var(--accent); }
+
+  .step-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.2rem 1.5rem;
+    cursor: pointer;
+    background: var(--surface);
+    user-select: none;
+  }
+
+  .step-num {
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--muted);
+    flex-shrink: 0;
+    transition: all 0.2s;
+  }
+
+  .step.active-step .step-num {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(0,255,136,0.1);
+  }
+
+  .step-info { flex: 1; }
+  .step-title { font-size: 1rem; font-weight: 600; }
+  .step-meta { font-size: 0.75rem; color: var(--muted); font-family: 'Space Mono', monospace; margin-top: 0.2rem; }
+
+  .step-toggle {
+    font-size: 1.2rem;
+    color: var(--muted);
+    transition: transform 0.2s;
+  }
+
+  .step.active-step .step-toggle { transform: rotate(45deg); color: var(--accent); }
+
+  .step-body {
+    display: none;
+    padding: 0 1.5rem 1.5rem;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+  }
+
+  .step.active-step .step-body { display: block; }
+
+  /* CODE BLOCKS */
+  .code-block {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin: 1rem 0;
+    overflow: hidden;
+  }
+
+  .code-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid var(--border);
+    background: rgba(255,255,255,0.02);
+  }
+
+  .code-filename {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--muted);
+  }
+
+  .copy-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 0.2rem 0.6rem;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.2s;
+  }
+
+  .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  pre {
+    padding: 1.2rem;
+    overflow-x: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.78rem;
+    line-height: 1.7;
+    color: #cdd6f4;
+  }
+
+  /* Syntax highlight colors */
+  .kw { color: #cba6f7; }
+  .str { color: #a6e3a1; }
+  .cm { color: #585b70; }
+  .fn { color: #89b4fa; }
+  .num { color: #fab387; }
+  .var { color: #cdd6f4; }
+
+  /* TIPS & NOTES */
+  .tip {
+    display: flex;
+    gap: 0.8rem;
+    padding: 0.8rem 1rem;
+    border-radius: 4px;
+    margin: 1rem 0;
+    font-size: 0.85rem;
+  }
+
+  .tip.info { background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.2); }
+  .tip.warn { background: rgba(255,107,53,0.08); border: 1px solid rgba(255,107,53,0.2); }
+  .tip.success { background: rgba(0,255,136,0.06); border: 1px solid rgba(0,255,136,0.2); }
+
+  .tip-icon { flex-shrink: 0; font-size: 1rem; }
+  .tip-text { color: var(--text); }
+  .tip-text strong { display: block; margin-bottom: 0.2rem; font-size: 0.8rem; }
+
+  /* CHECKLIST */
+  .checklist { list-style: none; margin: 1rem 0; }
+  .checklist li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.8rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    font-size: 0.88rem;
+  }
+
+  .checklist li::before {
+    content: '○';
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    flex-shrink: 0;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: color 0.2s;
+  }
+
+  .checklist li.checked::before { content: '●'; color: var(--accent); }
+  .checklist li.checked span { text-decoration: line-through; opacity: 0.5; }
+
+  /* FOLDER TREE */
+  .tree {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.78rem;
+    line-height: 2;
+    padding: 1.2rem;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin: 1rem 0;
+  }
+
+  .tree .dir { color: #89b4fa; }
+  .tree .file { color: #cdd6f4; }
+  .tree .comm { color: #585b70; }
+
+  /* SECTION HEADINGS */
+  .section-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin: 2rem 0 0.8rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  p { margin: 0.8rem 0; font-size: 0.9rem; color: #cbd5e1; }
+
+  /* TECH TAGS */
+  .tags { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.8rem 0; }
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 2px;
+    border: 1px solid;
+  }
+
+  .tag.py { color: #fbbf24; border-color: rgba(251,191,36,0.3); background: rgba(251,191,36,0.05); }
+  .tag.sql { color: #60a5fa; border-color: rgba(96,165,250,0.3); background: rgba(96,165,250,0.05); }
+  .tag.docker { color: #38bdf8; border-color: rgba(56,189,248,0.3); background: rgba(56,189,248,0.05); }
+  .tag.airflow { color: #f472b6; border-color: rgba(244,114,182,0.3); background: rgba(244,114,182,0.05); }
+  .tag.git { color: #fb923c; border-color: rgba(251,146,60,0.3); background: rgba(251,146,60,0.05); }
+
+  /* FOOTER */
+  footer {
+    margin: 4rem 0 2rem;
+    padding: 2rem 0;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: gap;
+  }
+
+  .footer-text {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--muted);
+  }
+
+  .github-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--accent);
+    color: #000;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.6rem 1.2rem;
+    border-radius: 2px;
+    text-decoration: none;
+    transition: opacity 0.2s;
+  }
+
+  .github-btn:hover { opacity: 0.85; }
+
+  /* ANIMATIONS */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .step-body { animation: fadeIn 0.2s ease; }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- HEADER -->
+  <header>
+    <div class="badge">DATA ENGINEERING · PORTFOLIO PROJECT</div>
+    <h1>Pipeline <em>ETL</em><br>de Principio a Fin</h1>
+    <p class="subtitle">// API pública → Python → PostgreSQL → Airflow → Docker → GitHub</p>
+    <div class="progress-bar" id="progressBar"></div>
+  </header>
+
+  <!-- ARCHITECTURE -->
+  <div class="arch-diagram">
+    <div class="arch-title">// ARQUITECTURA DEL SISTEMA</div>
+    <div class="arch-flow">
+      <div class="arch-node orchestrate">
+        <div class="icon">🌬️</div>
+        <div class="label">ORQUESTA</div>
+        <div class="tech">Airflow</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-node extract">
+        <div class="icon">🌐</div>
+        <div class="label">EXTRAE</div>
+        <div class="tech">Open-Meteo API</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-node transform">
+        <div class="icon">⚙️</div>
+        <div class="label">TRANSFORMA</div>
+        <div class="tech">Python + Pandas</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-node load">
+        <div class="icon">🗄️</div>
+        <div class="label">CARGA</div>
+        <div class="tech">PostgreSQL</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-node orchestrate">
+        <div class="icon">🐳</div>
+        <div class="label">CONTENEDOR</div>
+        <div class="tech">Docker Compose</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEPS -->
+  <div class="steps" id="stepsContainer">
+
+    <!-- STEP 1 -->
+    <div class="step active-step" data-step="1">
+      <div class="step-header" onclick="toggleStep(this)">
+        <div class="step-num">01</div>
+        <div class="step-info">
+          <div class="step-title">Estructura del Repositorio</div>
+          <div class="step-meta">// setup · git init · estructura de carpetas</div>
+        </div>
+        <div class="step-toggle">+</div>
+      </div>
+      <div class="step-body">
+        <div class="tags">
+          <span class="tag git">Git</span>
+          <span class="tag docker">Docker</span>
+        </div>
+
+        <p>Primero, crea el repositorio en GitHub y clónalo. Esta estructura de carpetas sigue las convenciones de proyectos de Data Engineering profesionales.</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-filename">terminal</span>
+            <button class="copy-btn" onclick="copyCode(this)">COPIAR</button>
+          </div>
+          <pre><span class="cm"># 1. Crea repo en GitHub (sin README por ahora)
+# 2. Clona y configura</span>
+<span class="fn">git</span> <span class="var">clone</span> https://github.com/TU_USUARIO/etl-weather-pipeline
+<span class="fn">cd</span> etl-weather-pipeline
+<span class="fn">git</span> <span class="var">checkout</span> -b main</pre>
+        </div>
+
+        <div class="section-label">// estructura de carpetas</div>
+        <div class="tree">
+<span class="dir">etl-weather-pipeline/</span>
+├── <span class="dir">dags/</span>                    <span class="comm"># DAGs de Airflow</span>
+│   └── <span class="file">weather_etl_dag.py</span>
+├── <span class="dir">etl/</span>                     <span class="comm"># Lógica ETL modular</span>
+│   ├── <span class="file">__init__.py</span>
+│   ├── <span class="file">extract.py</span>
+│   ├── <span class="file">transform.py</span>
+│   └── <span class="file">load.py</span>
+├── <span class="dir">sql/</span>                     <span class="comm"># Scripts DDL</span>
+│   └── <span class="file">create_tables.sql</span>
+├── <span class="dir">tests/</span>                   <span class="comm"># Tests unitarios</span>
+│   └── <span class="file">test_transform.py</span>
+├── <span class="dir">docs/</span>                    <span class="comm"># Diagrama arquitectura</span>
+│   └── <span class="file">architecture.png</span>
+├── <span class="file">.env.example</span>            <span class="comm"># Template variables entorno</span>
+├── <span class="file">.gitignore</span>
+├── <span class="file">docker-compose.yml</span>
+├── <span class="file">Dockerfile</span>
+├── <span class="file">requirements.txt</span>
+└── <span class="file">README.md</span>
+        </div>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-filename">.gitignore</span>
+            <button class="copy-btn" onclick="copyCode(this)">COPIAR</button>
+          </div>
+          <pre><span class="cm"># Entorno virtual</span>
+<span class="var">venv/</span>
+<span class="var">__pycache__/</span>
+<span class="var">*.pyc</span>
+
+<span class="cm"># Variables de entorno (NUNCA subir)</span>
+<span class="var">.env</span>
+
+<span class="cm"># Airflow</span>
+<span class="var">logs/</span>
+<span class="var">plugins/</span>
+<span class="var">airflow.db</span></pre>
+        </div>
+
+        <div class="tip success">
+          <span class="tip-icon">✅</span>
+          <div class="tip-text">
+            <strong>BUENA PRÁCTICA: commits atómicos</strong>
+            Cada commit debe hacer UNA cosa: "feat: add folder structure", "chore: add gitignore". Usa Conventional Commits para que tu historial sea profesional.
+          </div>
+        </div>
+
+        <ul class="checklist">
+          <li onclick="checkItem(this)"><span>Repositorio creado en GitHub</span></li>
+          <li onclick="checkItem(this)"><span>Estructura de carpetas creada</span></li>
+          <li onclick="checkItem(this)"><span>.gitignore configurado</span></li>
+          <li onclick="checkItem(this)"><span>Primer commit subido</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="step" data-step="2">
+      <div class="step-header" onclick="toggleStep(this)">
+        <div class="step-num">02</div>
+        <div class="step-info">
+          <div class="step-title">Docker Compose + Entorno</div>
+          <div class="step-meta">// postgresql · airflow · variables de entorno</div>
+        </div>
+        <div class="step-toggle">+</div>
+      </div>
+      <div class="step-body">
+        <div class="tags">
+          <span class="tag docker">Docker</span>
+          <span class="tag sql">PostgreSQL</span>
+          <span class="tag airflow">Airflow</span>
+        </div>
+
+        <p>Toda la infraestructura corre en Docker. Nadie necesita instalar nada: solo <code>docker compose up</code>. Eso es lo que buscan los recruiters.</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-filename">.env.example</span>
+            <button class="copy-btn" onclick="copyCode(this)">COPIAR</button>
+          </div>
+          <pre><span class="cm"># Copia este archivo como .env y llena los valores</span>
+<span class="var">POSTGRES_USER</span>=airflow
+<span class="var">POSTGRES_PASSWORD</span>=airflow
+<span class="var">POSTGRES_DB</span>=weather_db
+<span class="var">POSTGRES_HOST</span>=postgres
+<span class="var">POSTGRES_PORT</span>=5432
+
+<span class="var">AIRFLOW__CORE__EXECUTOR</span>=LocalExecutor
+<span class="var">AIRFLOW__CORE__FERNET_KEY</span>=<span class="cm"># genera con: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"</span>
+<span class="var">AIRFLOW__WEBSERVER__SECRET_KEY</span>=supersecretkey
+
+<span class="cm"># API (Open-Meteo es gratis, no necesita key)</span>
+<span class="var">WEATHER_CITY</span>=Mexico City
+<span class="var">WEATHER_LAT</span>=19.4326
+<span class="var">WEATHER_LON</span>=-99.1332</pre>
+        </div>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-filename">docker-compose.yml</span>
+            <button class="copy-btn" onclick="copyCode(this)">COPIAR</button>
+          </div>
+          <pre><span class="var">version</span>: <span class="str">'3.8'</span>
+
+<span class="var">x-airflow-common</span>: &amp;airflow-common
+  <span class="var">image</span>: apache/airflow:2.9.0-python3.11
+  <span class="var">env_file</span>: .env
+  <span class="var">volumes</span>:
+    - ./dags:/opt/airflow/dags
+    - ./etl:/opt/airflow/etl
+    - ./logs:/opt/airflow/logs
+  <span class="var">depends_on</span>:
+    <span class="var">postgres</span>:
+      <span class="var">condition</span>: service_healthy
+
+<span class="var">services</span>:
+  <span class="var">postgres</span>:
+    <span class="var">image</span>: postgres:15
+    <span class="var">env_file</span>: .env
+    <span class="var">ports</span>:
+      - <span class="str">"5432:5432"</span>
+    <span class="var">volumes</span>:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql:/docker-entrypoint-initdb.d
+    <span class="var">healthcheck</span>:
+      <span class="var">test</span>: [<span class="str">"CMD"</span>, <span class="str">"pg_isready"</span>, <span class="str">"-U"</span>, <span class="str">"airflow"</span>]
+      <span class="var">interval</span>: 5s
+      <span class="var">retries</span>: 5
+
+  <span class="var">airflow-init</span>:
+    &lt;&lt;: *airflow-common
+    <span class="var">command</span>: >
+      bash -c "
+        airflow db init &&
+        airflow users create --username admin --password admin
+          --firstname Admin --lastname User
+          --role Admin --email admin@example.com
+      "
+
+  <span class="var">airflow-webserver</span>:
+    &lt;&lt;: *airflow-common
+    <span class="var">command</span>: webserver
+    <span class="var">ports</span>:
+      - <span class="str">"8080:8080"</span>
+    <span class="var">depends_on</span>:
+      - airflow-init
+
+  <span class="var">airflow-scheduler</span>:
+    &lt;&lt;: *airflow-common
+    <span class="var">command</span>: scheduler
+    <span class="var">depends_on</span>:
+      - airflow-init
+
+<span class="var">volumes</span>:
+  <span class="var">postgres_data</span>:</pre>
+        </div>
+
+        <div class="tip warn">
+          <span class="tip-icon">⚠️</span>
+          <div class="tip-text">
+            <strong>NUNCA subas el archivo .env a GitHub</strong>
+            Sube solo el .env.example con valores de placeholder. El .env real con credenciales debe estar en tu .gitignore.
+          </div>
+        </div>
+
+        <ul class="checklist">
+          <li onclick="checkItem(this)"><span>.env creado localmente (NO subir)</span></li>
+          <li onclick="checkItem(this)"><span>.env.example subido al repo</span></li>
+          <li onclick="checkItem(this)"><span>docker-compose.yml configurado</span></li>
+          <li onclick="checkItem(this)"><span><code>docker compose up -d</code> funciona</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="step" data-step="3">
+      <div class="step-header" onclick="toggleStep(this)">
+        <div class="step-num">03</div>
+        <div class="step-info">
+          <div class="step-title">Extract — Consumir la API</div>
+          <div class="step-meta">// open-meteo api · requests · sin API key</div>
+        </div>
+        <div class="step-toggle">+</div>
+      </div>
+      <div class="step-body">
+        <div class="tags">
+          <span class="tag py">Python</span>
+        </div>
+
+        <p>Usamos <strong>Open-Meteo</strong>: una API meteorológica gratuita y sin autenticación. Perfecta para portfolios. Extraemos temperatura, humedad y velocidad del viento por hora.</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-filename">etl/extract.py</span>
+            <button class="copy-btn" onclick="copyCode(this)">COPIAR</button>
+          </div>
+          <pre><span class="kw">import</span> requests
+<span class="kw">import</span> logging
+<span class="kw">from</span> datetime <span class="kw">import</span> date
+
+logger = logging.<span class="fn">getLogger</span>(<span class="var">__name__</span>)
+
+<span class="var">BASE_URL</span> = <span class="str">"https://api.open-meteo.com/v1/forecast"</span>
+
+<span class="kw">def</span> <span class="fn">extract_weather</span>(lat: float, lon: float) -> dict:
+    <span class="str">"""
+    Extrae datos meteorológicos de Open-Meteo API.
+    
+    Args:
+        lat: Latitud de la ciudad
+        lon: Longitud de la ciudad
+    
+    Returns:
+        Dict con datos crudos de la API
+    
+    Raises:
+        requests.HTTPError: Si la API responde con error
+    """</span>
+    params = {
+        <span class="str">"latitude"</span>: lat,
+        <span class="str">"longitude"</span>: lon,
+        <span class="str">"hourly"</span>: <span class="str">"temperature_2m,relativehumidity_2m,windspeed_10m"</span>,
+        <span class="str">"timezone"</span>: <span class="str">"auto"</span>,
+        <span class="str">"start_date"</span>: str(date.today()),
+        <span class="str">"end_date"</span>: str(date.today()),
+    }
+
+    logger.<span class="fn">info</span>(<span class="str">f"Extrayendo datos: lat={lat}, lon={lon}"</span>)
+    
+    response = requests.<span class="fn">get</span>(BASE_URL, params=params, timeout=<span class="num">30</span>)
+    response.<span class="fn">raise_for_status</span>()
+    
+    data = response.<span class="fn">json</span>()
+    logger.<span class="fn">info</span>(<span class="str">f"Datos recibidos: {len(data['hourly']['time'])} registros"</span>)
+    
+    <span class="kw">return</span> data</pre>
+        </div>
+
+        <div class="tip info">
+          <span class="tip-icon">💡</span>
+          <div class="tip-text">
+            <strong>¿Por qué Open-Meteo?</strong>
+            APIs como OpenWeatherMap requieren registro y tienen límites de uso. Open-Meteo es 100% gratis, sin registro y perfecta para demostrar skills de ETL sin fricciones.
+          </div>
+        </div>
+
+        <ul class="checklist">
+          <li onclick="checkItem(this)"><span>etl/extract.py creado</span></li>
+          <li onclick="checkItem(this)"><span>Probado manualmente con python -c "from etl.extract import extract_weather; print(extract_weather(19.4, -99.1))"</span></li>
+          <li onclick="checkItem(this)"><span>Logging configurado</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- STEP 4 -->
+    <div class="step" data-step="4">
+      <div class="step-header" onclick="toggleStep(this)">
+        <div class="step-num">04</div>
+        <div class="step-info">
+          <div class="step-title">Transform — Limpiar con Pandas</div>
+          <div class="step-meta">// pandas · validación · normalización</div>
+        </div>
+        <div class="step-toggle">+</div>
+      </div>
+      <div class="step-body">
+        <div class="tags">
+          <span class="tag py">Python</span>
+          <span class="tag py">Pandas</span>
+        </div>
+
+        <p>La transformación convierte el JSON crudo en un DataFrame limpio, con tipos correctos, columnas renombradas y sin nulos.</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-filename">etl/transform.py</span>
+            <button class="copy-btn" onclick="copyCode(this)">COPIAR</button>
+          </div>
+          <pre><span class="kw">import</span> pandas <span class="kw">as</span> pd
+<span class="kw">import</span> logging
+
+logger = logging.<span class="fn">getLogger</span>(<span class="var">__name__</span>)
+
+<span class="kw">def</span> <span class="fn">transform_weather</span>(raw_data: dict, city: str) -> pd.DataFrame:
+    <span class="str">"""
+    Transforma datos crudos de la API en DataFrame normalizado.
+    
+    Args:
+        raw_data: Respuesta JSON de la API
+        city: Nombre de la ciudad para enriquecer el dataset
+    
+    Returns:
+        DataFrame limpio y tipado listo para cargar
+    """</span>
+    hourly = raw_data[<span class="str">"hourly"</span>]
+    
+    df = pd.<span class="fn">DataFrame</span>({
+        <span class="str">"timestamp"</span>: hourly[<span class="str">"time"</span>],
+        <span class="str">"temperature_c"</span>: hourly[<span class="str">"temperature_2m"</span>],
+        <span class="str">"humidity_pct"</span>: hourly[<span class="str">"relativehumidity_2m"</span>],
+        <span class="str">"windspeed_kmh"</span>: hourly[<span class="str">"windspeed_10m"</span>],
+    })
+
+    <span class="cm"># Tipado correcto</span>
+    df[<span class="str">"timestamp"</span>] = pd.<span class="fn">to_datetime</span>(df[<span class="str">"timestamp"</span>])
+    df[<span class="str">"city"</span>] = city
+    df[<span class="str">"extracted_at"</span>] = pd.<span class="fn">Timestamp</span>.now(tz=<span class="str">"UTC"</span>)
+
+    <span class="cm"># Validación básica</span>
+    initial_rows = <span class="fn">len</span>(df)
+    df = df.<span class="fn">dropna</span>(subset=[<span class="str">"temperature_c"</span>, <span class="str">"humidity_pct"</span>])
+    df = df[df[<span class="str">"temperature_c"</span>].<span class="fn">between</span>(-<span class="num">50</span>, <span class="num">60</span>)]
+    df = df[df[<span class="str">"humidity_pct"</span>].<span class="fn">between</span>(<span class="num">0</span>, <span class="num">100</span>)]
+
+    dropped = initial_rows - <span class="fn">len</span>(df)
+    <span class="kw">if</span> dropped > <span class="num">0</span>:
+        logger.<span class="fn">warning</span>(<span class="str">f"Se descartaron {dropped} registros inválidos"</span>)
+
+    <span class="cm"># Feature derivada</span>
+    df[<span class="str">"feels_hot"</span>] = (
+        (df[<span class="str">"temperature_c"</span>] > <span class="num">28</span>) & (df[<span class="str">"humidity_pct"</span>] > <span class="num">60</span>)
+    )
+
+    logger.<span class="fn">info</span>(<span class="str">f"Transform completado: {len(df)} filas"</span>)
+    <span class="kw">return</span> df</pre>
+        </div>
+
+        <ul class="checklist">
+          <li onclick="checkItem(this)"><span>etl/transform.py creado</span></li>
+          <li onclick="checkItem(this)"><span>Validación de rangos implementada</span></li>
+          <li onclick="checkItem(this)"><span>Feature derivada (feels_hot) añadida</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- STEP 5 -->
+    <div class="step" data-step="5">
+      <div class="step-header" onclick="toggleStep(this)">
+        <div class="step-num">05</div>
+        <div class="step-info">
+          <div class="step-title">Load — PostgreSQL con SQLAlchemy</div>
+          <div class="step-meta">// sqlalchemy · upsert · idempotencia</div>
+        </div>
+        <div class="step-toggle">+</div>
+      </div>
+      <div class="step-body">
+        <div class="tags">
+          <span class="tag sql">PostgreSQL</span>
+          <span class="tag py">SQLAlchemy</span>
+        </div>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-filename">sql/create_tables.sql</span>
+            <button class="copy-btn" onclick="copyCode(this)">COPIAR</button>
+          </div>
+          <pre><span class="kw">CREATE TABLE IF NOT EXISTS</span> weather_hourly (
+    id          SERIAL <span class="kw">PRIMARY KEY</span>,
+    city        VARCHAR(<span class="num">100</span>) <span class="kw">NOT NULL</span>,
+    timestamp   TIMESTAMPTZ  <span class="kw">NOT NULL</span>,
+    temperature_c   NUMERIC(<span class="num">5</span>,<span class="num">2</span>),
+    humidity_pct    SMALLINT,
+    windspeed_kmh   NUMERIC(<span class="num">6</span>,<span class="num">2</span>),
+    feels_hot       BOOLEAN,
+    extracted_at    TIMESTAMPTZ <span class="kw">DEFAULT</span> NOW(),
+    <span class="kw">UNIQUE</span>(city, timestamp)  <span class="cm">-- evita duplicados</span>
+);
+
+<span class="kw">CREATE INDEX IF NOT EXISTS</span> idx_weather_city_ts
+    <span class="kw">ON</span> weather_hourly(city, timestamp <span class="kw">DESC</span>);</pre>
+        </div>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-filename">etl/load.py</span>
+            <button class="copy-btn" onclick="copyCode(this)">COPIAR</button>
+          </div>
+          <pre><span class="kw">import</span> os
+<span class="kw">import</span> pandas <span class="kw">as</span> pd
+<span class="kw">import</span> logging
+<span class="kw">from</span> sqlalchemy <span class="kw">import</span> create_engine, text
+
+logger = logging.<span class="fn">getLogger</span>(<span class="var">__name__</span>)
+
+<span class="kw">def</span> <span class="fn">get_engine</span>():
+    <span class="str">"""Crea engine de SQLAlchemy desde variables de entorno."""</span>
+    user = os.<span class="fn">getenv</span>(<span class="str">"POSTGRES_USER"</span>)
+    pwd  = os.<span class="fn">getenv</span>(<span class="str">"POSTGRES_PASSWORD"</span>)
+    host = os.<span class="fn">getenv</span>(<span class="str">"POSTGRES_HOST"</span>, <span class="str">"localhost"</span>)
+    port = os.<span class="fn">getenv</span>(<span class="str">"POSTGRES_PORT"</span>, <span class="str">"5432"</span>)
+    db   = os.<span class="fn">getenv</span>(<span class="str">"POSTGRES_DB"</span>)
+    
+    url = <span class="str">f"postgresql+psycopg2://{user}:{pwd}@{host}:{port}/{db}"</span>
+    <span class="kw">return</span> create_engine(url, pool_pre_ping=<span class="kw">True</span>)
+
+<span class="kw">def</span> <span class="fn">load_weather</span>(df: pd.DataFrame) -> int:
+    <span class="str">"""
+    Carga DataFrame en PostgreSQL con upsert (idempotente).
+    
+    Returns:
+        Número de filas insertadas/actualizadas
+    """</span>
+    engine = <span class="fn">get_engine</span>()
+    
+    <span class="cm"># Staging table → upsert → producción</span>
+    <span class="kw">with</span> engine.<span class="fn">begin</span>() <span class="kw">as</span> conn:
+        df.<span class="fn">to_sql</span>(<span class="str">"weather_staging"</span>, conn,
+                   if_exists=<span class="str">"replace"</span>, index=<span class="kw">False</span>)
+        
+        upsert_sql = <span class="fn">text</span>(<span class="str">"""
+            INSERT INTO weather_hourly
+                (city, timestamp, temperature_c, humidity_pct,
+                 windspeed_kmh, feels_hot, extracted_at)
+            SELECT city, timestamp, temperature_c, humidity_pct,
+                   windspeed_kmh, feels_hot, extracted_at
+            FROM weather_staging
+            ON CONFLICT (city, timestamp)
+            DO UPDATE SET
+                temperature_c = EXCLUDED.temperature_c,
+                humidity_pct  = EXCLUDED.humidity_pct,
+                windspeed_kmh = EXCLUDED.windspeed_kmh,
+                extracted_at  = EXCLUDED.extracted_at;
+        """</span>)
+        result = conn.<span class="fn">execute</span>(upsert_sql)
+    
+    rows = result.rowcount
+    logger.<span class="fn">info</span>(<span class="str">f"Cargadas {rows} filas en weather_hourly"</span>)
+    <span class="kw">return</span> rows</pre>
+        </div>
+
+        <div class="tip success">
+          <span class="tip-icon">✅</span>
+          <div class="tip-text">
+            <strong>IDEMPOTENCIA: clave en Data Engineering</strong>
+            El ON CONFLICT DO UPDATE garantiza que si el pipeline corre dos veces el mismo día, no habrá datos duplicados. Esto es lo que diferencia un pipeline amateur de uno profesional.
+          </div>
+        </div>
+
+        <ul class="checklist">
+          <li onclick="checkItem(this)"><span>sql/create_tables.sql creado</span></li>
+          <li onclick="checkItem(this)"><span>etl/load.py creado</span></li>
+          <li onclick="checkItem(this)"><span>UPSERT implementado (ON CONFLICT)</span></li>
+          <li onclick="checkItem(this)"><span>Conexión usando variables de entorno</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- STEP 6 -->
+    <div class="step" data-step="6">
+      <div class="step-header" onclick="toggleStep(this)">
+        <div class="step-num">06</div>
+        <div class="step-info">
+          <div class="step-title">DAG de Airflow</div>
+          <div class="step-meta">// dag · taskflow api · schedule diario</div>
+        </div>
+        <div class="step-toggle">+</div>
+      </div>
+      <div class="step-body">
+        <div class="tags">
+          <span class="tag airflow">Airflow</span>
+          <span class="tag py">Python</span>
+        </div>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-filename">dags/weather_etl_dag.py</span>
+            <button class="copy-btn" onclick="copyCode(this)">COPIAR</button>
+          </div>
+          <pre><span class="kw">from</span> datetime <span class="kw">import</span> datetime, timedelta
+<span class="kw">import</span> os
+
+<span class="kw">from</span> airflow.decorators <span class="kw">import</span> dag, task
+<span class="kw">from</span> etl.extract   <span class="kw">import</span> extract_weather
+<span class="kw">from</span> etl.transform <span class="kw">import</span> transform_weather
+<span class="kw">from</span> etl.load      <span class="kw">import</span> load_weather
+
+<span class="var">default_args</span> = {
+    <span class="str">"owner"</span>: <span class="str">"data-team"</span>,
+    <span class="str">"retries"</span>: <span class="num">3</span>,
+    <span class="str">"retry_delay"</span>: timedelta(minutes=<span class="num">5</span>),
+    <span class="str">"email_on_failure"</span>: <span class="kw">False</span>,
+}
+
+<span class="fn">@dag</span>(
+    dag_id=<span class="str">"weather_etl_pipeline"</span>,
+    description=<span class="str">"ETL diario: Open-Meteo → PostgreSQL"</span>,
+    schedule=<span class="str">"@daily"</span>,
+    start_date=datetime(<span class="num">2024</span>, <span class="num">1</span>, <span class="num">1</span>),
+    catchup=<span class="kw">False</span>,
+    default_args=default_args,
+    tags=[<span class="str">"etl"</span>, <span class="str">"weather"</span>, <span class="str">"portfolio"</span>],
+)
+<span class="kw">def</span> <span class="fn">weather_etl</span>():
+    <span class="str">"""Pipeline ETL de datos meteorológicos usando Open-Meteo API."""</span>
+
+    <span class="fn">@task</span>()
+    <span class="kw">def</span> <span class="fn">extract</span>() -> dict:
+        lat = float(os.<span class="fn">getenv</span>(<span class="str">"WEATHER_LAT"</span>, <span class="str">"19.4326"</span>))
+        lon = float(os.<span class="fn">getenv</span>(<span class="str">"WEATHER_LON"</span>, <span class="str">"-99.1332"</span>))
+        <span class="kw">return</span> <span class="fn">extract_weather</span>(lat, lon)
+
+    <span class="fn">@task</span>()
+    <span class="kw">def</span> <span class="fn">transform</span>(raw: dict) -> list:
+        city = os.<span class="fn">getenv</span>(<span class="str">"WEATHER_CITY"</span>, <span class="str">"Ciudad de México"</span>)
+        df = <span class="fn">transform_weather</span>(raw, city)
+        <span class="kw">return</span> df.<span class="fn">to_dict</span>(orient=<span class="str">"records"</span>)
+
+    <span class="fn">@task</span>()
+    <span class="kw">def</span> <span class="fn">load</span>(records: list) -> int:
+        <span class="kw">import</span> pandas <span class="kw">as</span> pd
+        df = pd.<span class="fn">DataFrame</span>(records)
+        <span class="kw">return</span> <span class="fn">load_weather</span>(df)
+
+    raw_data  = <span class="fn">extract</span>()
+    clean_df  = <span class="fn">transform</span>(raw_data)
+    <span class="fn">load</span>(clean_df)
+
+<span class="fn">weather_etl</span>()</pre>
+        </div>
+
+        <div class="tip info">
+          <span class="tip-icon">💡</span>
+          <div class="tip-text">
+            <strong>TaskFlow API (decoradores @task)</strong>
+            Es la forma moderna de Airflow 2.x. Las dependencias entre tareas se infieren automáticamente del flujo del código Python. Mucho más limpio que el estilo antiguo con PythonOperator.
+          </div>
+        </div>
+
+        <ul class="checklist">
+          <li onclick="checkItem(this)"><span>DAG creado en dags/</span></li>
+          <li onclick="checkItem(this)"><span>DAG visible en Airflow UI (localhost:8080)</span></li>
+          <li onclick="checkItem(this)"><span>Test manual: Trigger DAG → éxito en las 3 tasks</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- STEP 7 -->
+    <div class="step" data-step="7">
+      <div class="step-header" onclick="toggleStep(this)">
+        <div class="step-num">07</div>
+        <div class="step-info">
+          <div class="step-title">Tests + requirements.txt</div>
+          <div class="step-meta">// pytest · dependencias · reproducibilidad</div>
+        </div>
+        <div class="step-toggle">+</div>
+      </div>
+      <div class="step-body">
+        <div class="tags">
+          <span class="tag py">pytest</span>
+          <span class="tag py">Python</span>
+        </div>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-filename">requirements.txt</span>
+            <button class="copy-btn" onclick="copyCode(this)">COPIAR</button>
+          </div>
+          <pre>apache-airflow==2.9.0
+pandas==2.2.2
+requests==2.31.0
+sqlalchemy==2.0.30
+psycopg2-binary==2.9.9
+pytest==8.2.0</pre>
+        </div>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-filename">tests/test_transform.py</span>
+            <button class="copy-btn" onclick="copyCode(this)">COPIAR</button>
+          </div>
+          <pre><span class="kw">import</span> pytest
+<span class="kw">from</span> etl.transform <span class="kw">import</span> transform_weather
+
+<span class="var">MOCK_API_RESPONSE</span> = {
+    <span class="str">"hourly"</span>: {
+        <span class="str">"time"</span>: [<span class="str">"2024-01-01T00:00"</span>, <span class="str">"2024-01-01T01:00"</span>],
+        <span class="str">"temperature_2m"</span>: [<span class="num">22.5</span>, <span class="num">21.0</span>],
+        <span class="str">"relativehumidity_2m"</span>: [<span class="num">65</span>, <span class="num">70</span>],
+        <span class="str">"windspeed_10m"</span>: [<span class="num">12.3</span>, <span class="num">10.1</span>],
+    }
+}
+
+<span class="kw">def</span> <span class="fn">test_transform_returns_dataframe</span>():
+    df = <span class="fn">transform_weather</span>(MOCK_API_RESPONSE, <span class="str">"Test City"</span>)
+    <span class="kw">assert</span> <span class="fn">len</span>(df) == <span class="num">2</span>
+
+<span class="kw">def</span> <span class="fn">test_transform_columns</span>():
+    df = <span class="fn">transform_weather</span>(MOCK_API_RESPONSE, <span class="str">"Test City"</span>)
+    expected = {<span class="str">"timestamp"</span>, <span class="str">"temperature_c"</span>, <span class="str">"humidity_pct"</span>,
+                <span class="str">"windspeed_kmh"</span>, <span class="str">"city"</span>, <span class="str">"feels_hot"</span>, <span class="str">"extracted_at"</span>}
+    <span class="kw">assert</span> expected.<span class="fn">issubset</span>(df.columns)
+
+<span class="kw">def</span> <span class="fn">test_transform_city_column</span>():
+    df = <span class="fn">transform_weather</span>(MOCK_API_RESPONSE, <span class="str">"CDMX"</span>)
+    <span class="kw">assert</span> (df[<span class="str">"city"</span>] == <span class="str">"CDMX"</span>).<span class="fn">all</span>()
+
+<span class="kw">def</span> <span class="fn">test_transform_drops_invalid_temp</span>():
+    bad_data = {<span class="str">"hourly"</span>: {
+        <span class="str">"time"</span>: [<span class="str">"2024-01-01T00:00"</span>],
+        <span class="str">"temperature_2m"</span>: [<span class="num">999</span>],   <span class="cm"># temperatura inválida</span>
+        <span class="str">"relativehumidity_2m"</span>: [<span class="num">50</span>],
+        <span class="str">"windspeed_10m"</span>: [<span class="num">10</span>],
+    }}
+    df = <span class="fn">transform_weather</span>(bad_data, <span class="str">"City"</span>)
+    <span class="kw">assert</span> <span class="fn">len</span>(df) == <span class="num">0</span></pre>
+        </div>
+
+        <ul class="checklist">
+          <li onclick="checkItem(this)"><span>requirements.txt completo</span></li>
+          <li onclick="checkItem(this)"><span>tests/test_transform.py creado</span></li>
+          <li onclick="checkItem(this)"><span><code>pytest tests/</code> pasa sin errores</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- STEP 8 -->
+    <div class="step" data-step="8">
+      <div class="step-header" onclick="toggleStep(this)">
+        <div class="step-num">08</div>
+        <div class="step-info">
+          <div class="step-title">README Profesional</div>
+          <div class="step-meta">// documentación · badges · guía de instalación</div>
+        </div>
+        <div class="step-toggle">+</div>
+      </div>
+      <div class="step-body">
+        <div class="tags">
+          <span class="tag git">GitHub</span>
+        </div>
+
+        <p>El README es lo primero que ve un recruiter. Debe tener: descripción clara, arquitectura visual, instrucciones para correr el proyecto, y tecnologías usadas.</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-filename">README.md (estructura)</span>
+            <button class="copy-btn" onclick="copyCode(this)">COPIAR</button>
+          </div>
+          <pre><span class="cm"># 🌤️ ETL Weather Pipeline</span>
+
+<span class="cm">![Python](badge) ![Airflow](badge) ![PostgreSQL](badge) ![Docker](badge)</span>
+
+Pipeline ETL que extrae datos meteorológicos de Open-Meteo API,
+los transforma con Python/Pandas y los carga en PostgreSQL,
+orquestado con Apache Airflow y contenedorizado con Docker.
+
+<span class="cm">## 🏗️ Arquitectura</span>
+
+<span class="cm">![Diagrama](docs/architecture.png)</span>
+
+Open-Meteo API → Python ETL → PostgreSQL ← Apache Airflow (orquesta)
+                                              ↑
+                                         Docker Compose
+
+<span class="cm">## 🚀 Cómo correr el proyecto</span>
+
+<span class="cm">### Prerrequisitos</span>
+- Docker Desktop instalado
+- Git
+
+<span class="cm">### Instalación</span>
+<span class="str">```bash</span>
+git clone https://github.com/TU_USUARIO/etl-weather-pipeline
+cd etl-weather-pipeline
+cp .env.example .env          <span class="cm"># edita si quieres otra ciudad</span>
+docker compose up -d
+docker compose run airflow-init
+<span class="str">```</span>
+
+Airflow UI: http://localhost:8080 (admin/admin)
+Activa el DAG `weather_etl_pipeline` y triggeralo manualmente.
+
+<span class="cm">## 📊 Estructura del pipeline</span>
+
+<span class="cm">| Fase      | Tecnología      | Descripción                    |</span>
+<span class="cm">|-----------|----------------|--------------------------------|</span>
+<span class="cm">| Extract   | Python/requests | Consume Open-Meteo API         |</span>
+<span class="cm">| Transform | Pandas          | Limpia, valida y enriquece     |</span>
+<span class="cm">| Load      | SQLAlchemy/PG   | Upsert idempotente             |</span>
+<span class="cm">| Orquesta  | Apache Airflow  | Schedule diario, reintentos    |</span>
+
+<span class="cm">## 🛠️ Stack tecnológico</span>
+Python · Pandas · Apache Airflow · PostgreSQL
+SQLAlchemy · Docker · pytest
+
+<span class="cm">## 📁 Estructura del repositorio</span>
+<span class="cm">(pega aquí el árbol de carpetas)</span>
+
+<span class="cm">## 📝 Decisiones de diseño</span>
+- **Idempotencia**: ON CONFLICT DO UPDATE previene duplicados
+- **Seguridad**: credenciales solo en .env (no en código)
+- **Modularidad**: Extract/Transform/Load en módulos separados
+- **Observabilidad**: logging en cada paso del pipeline</pre>
+        </div>
+
+        <div class="tip success">
+          <span class="tip-icon">✅</span>
+          <div class="tip-text">
+            <strong>SECCIÓN CLAVE: "Decisiones de diseño"</strong>
+            Esta sección demuestra que no solo escribiste código, sino que PENSASTE el diseño. Es lo que distingue a un junior excepcional. Explica el por qué de cada decisión técnica.
+          </div>
+        </div>
+
+        <ul class="checklist">
+          <li onclick="checkItem(this)"><span>README.md completo con todas las secciones</span></li>
+          <li onclick="checkItem(this)"><span>Badges de tecnologías añadidos</span></li>
+          <li onclick="checkItem(this)"><span>Diagrama de arquitectura en docs/</span></li>
+          <li onclick="checkItem(this)"><span>Instrucciones verificadas funcionan desde cero</span></li>
+        </ul>
+      </div>
+    </div>
+
+  </div><!-- /steps -->
+
+  <!-- CHECKLIST FINAL -->
+  <div style="margin: 3rem 0; padding: 2rem; background: var(--surface); border: 1px solid var(--border); border-radius: 4px;">
+    <div class="section-label">// CHECKLIST FINAL DEL PORTFOLIO</div>
+    <ul class="checklist">
+      <li onclick="checkItem(this)"><span>Pipeline corre de inicio a fin con <code>docker compose up</code></span></li>
+      <li onclick="checkItem(this)"><span>DAG visible y ejecutable en Airflow UI</span></li>
+      <li onclick="checkItem(this)"><span>Datos visibles en PostgreSQL después del run</span></li>
+      <li onclick="checkItem(this)"><span>Tests pasan con <code>pytest tests/</code></span></li>
+      <li onclick="checkItem(this)"><span>No hay credenciales hardcodeadas en el código</span></li>
+      <li onclick="checkItem(this)"><span>README permite a alguien desconocido correr el proyecto</span></li>
+      <li onclick="checkItem(this)"><span>Commits limpios con Conventional Commits</span></li>
+      <li onclick="checkItem(this)"><span>Repositorio público en GitHub</span></li>
+    </ul>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-text">
+      <div>ETL Weather Pipeline · Portfolio Project</div>
+      <div style="margin-top:0.3rem; opacity:0.5">Data Engineering · Airflow · Docker · PostgreSQL</div>
+    </div>
+    <a class="github-btn" href="https://github.com" target="_blank">
+      ↗ VER EN GITHUB
+    </a>
+  </footer>
+
+</div>
+
+<script>
+  const STEPS = [
+    "Repositorio", "Docker", "Extract", "Transform",
+    "Load", "Airflow", "Tests", "README"
+  ];
+
+  // Build progress bar
+  const bar = document.getElementById('progressBar');
+  STEPS.forEach((label, i) => {
+    const el = document.createElement('div');
+    el.className = 'progress-step' + (i === 0 ? ' active' : '');
+    el.textContent = label;
+    el.onclick = () => scrollToStep(i + 1);
+    bar.appendChild(el);
+  });
+
+  function scrollToStep(n) {
+    const step = document.querySelector(`[data-step="${n}"]`);
+    if (step) step.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function toggleStep(header) {
+    const step = header.parentElement;
+    const wasActive = step.classList.contains('active-step');
+    
+    document.querySelectorAll('.step').forEach(s => s.classList.remove('active-step'));
+    if (!wasActive) step.classList.add('active-step');
+    
+    updateProgress();
+  }
+
+  function updateProgress() {
+    const activeStep = document.querySelector('.step.active-step');
+    const steps = document.querySelectorAll('.progress-step');
+    steps.forEach(s => s.classList.remove('active', 'done'));
+    
+    if (activeStep) {
+      const n = parseInt(activeStep.dataset.step);
+      steps.forEach((s, i) => {
+        if (i < n - 1) s.classList.add('done');
+        else if (i === n - 1) s.classList.add('active');
+      });
+    }
+  }
+
+  function checkItem(li) {
+    li.classList.toggle('checked');
+    updateOverallProgress();
+  }
+
+  function updateOverallProgress() {
+    const total = document.querySelectorAll('.checklist li').length;
+    const done = document.querySelectorAll('.checklist li.checked').length;
+    document.title = `ETL Pipeline (${done}/${total} ✓)`;
+  }
+
+  function copyCode(btn) {
+    const pre = btn.closest('.code-block').querySelector('pre');
+    navigator.clipboard.writeText(pre.innerText).then(() => {
+      const orig = btn.textContent;
+      btn.textContent = 'COPIADO ✓';
+      btn.style.color = 'var(--accent)';
+      setTimeout(() => {
+        btn.textContent = orig;
+        btn.style.color = '';
+      }, 2000);
+    });
+  }
+
+  updateProgress();
+</script>
+</body>
+</html>
