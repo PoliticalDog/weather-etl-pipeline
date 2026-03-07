@@ -177,6 +177,25 @@ docker compose exec postgres psql -U airflow -d airflow -c "SELECT * FROM weathe
 
 ---
 
+##  Tests
+
+El proyecto incluye tests unitarios para la capa de transformación.
+
+Para correrlos:
+```bash
+docker compose exec airflow-scheduler python -m pytest /opt/airflow/tests/ -v
+```
+
+Resultado esperado:
+```
+tests/test_transform.py::test_transform_returns_dataframe PASSED
+tests/test_transform.py::test_transform_columns PASSED
+tests/test_transform.py::test_transform_city_column PASSED
+tests/test_transform.py::test_transform_drops_invalid_temp PASSED
+
+4 passed in 0.55s
+```
+
 ##  Autor
 
 **PoliticalDog** — [github.com/PoliticalDog](https://github.com/PoliticalDog)

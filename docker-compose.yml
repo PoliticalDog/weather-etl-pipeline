@@ -1,10 +1,13 @@
 x-airflow-common: &airflow-common
   image: apache/airflow:2.9.0-python3.11
   env_file: .env
+  environment:
+    _PIP_ADDITIONAL_REQUIREMENTS: "pytest pandas requests sqlalchemy psycopg2-binary"
   volumes:
     - ./dags:/opt/airflow/dags
     - ./etl:/opt/airflow/etl
     - ./logs:/opt/airflow/logs
+    - ./tests:/opt/airflow/tests
   depends_on:
     postgres:
       condition: service_healthy
