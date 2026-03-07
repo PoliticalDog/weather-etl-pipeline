@@ -1,11 +1,8 @@
 #etl_guide.html
 etl_guide.html
-#
-estructura.txt
 
-# Todos los word
-*.docx
-*.doc
+#Estructura del proyecto
+estructura.txt
 
 # Entorno virtual
 venv/
